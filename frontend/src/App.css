@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.sidebar {
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  overflow-x: hidden;
+}
+
+/* Prevent content from shifting when sidebar expands */
+.sidebar-container {
+  min-width: 64px;
+  width: 64px;
+}
+
+/* Ensure icons are always visible */
+.sidebar .icon {
+  min-width: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Smooth transition for text */
+.sidebar .text {
+  transition: opacity 0.3s ease;
+}
