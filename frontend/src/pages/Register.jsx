@@ -21,15 +21,14 @@ const Register = () => {
     (state) => state.auth
   );
 
+  // In the useEffect hook
   useEffect(() => {
-    localStorage.removeItem('user');
     if (isError) {
       toast.error(message);
     }
-
-    // Changed this part to redirect to login instead of dashboard
+    
     if (isSuccess) {
-      toast.success('Registration successful! Please log in with your new account.');
+      toast.success('Registration successful! Please login.');
       navigate('/login');
     }
 

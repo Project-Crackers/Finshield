@@ -40,10 +40,10 @@ const TransactionForm = ({ initialType = 'expense', onComplete }) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Check file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    // Check file type - restrict to only images (PNG and JPEG)
+    const validTypes = ['image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {
-      alert('Please upload only images (JPEG, PNG) or PDF files');
+      alert('Please upload only images (JPEG, PNG)');
       fileInputRef.current.value = '';
       return;
     }
@@ -57,17 +57,12 @@ const TransactionForm = ({ initialType = 'expense', onComplete }) => {
     
     setBillFile(file);
     
-    // Create preview for images only
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setBillPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      // For PDF files, show a placeholder
-      setBillPreview('pdf');
-    }
+    // Create preview for images
+    const reader = new FileReader();
+    reader.onload = () => {
+      setBillPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
   
   const removeBill = () => {
@@ -93,14 +88,6 @@ const TransactionForm = ({ initialType = 'expense', onComplete }) => {
       const uploadService = type === 'income' ? 
         (await import('../api/incomeService')).default.uploadReceipt :
         transactionService.uploadBill;
-      
-      // Configure progress tracking
-      const config = {
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
-        }
-      };
       
       const response = await uploadService(formData, config);
       setIsUploading(false);
@@ -240,17 +227,17 @@ const TransactionForm = ({ initialType = 'expense', onComplete }) => {
           type="file"
           accept="image/jpeg,image/png,image/jpg,application/pdf"
           onChange={handleFileChange}
-          className="file-input file-input-bordered w-full"
+          className="w-full file-input file-input-bordered"
           ref={fileInputRef}
         />
-        <div className="text-xs text-gray-500 mt-1">
-          Max size: 5MB. Allowed formats: JPEG, PNG, PDF
+        <div className="mt-1 text-xs text-gray-500">
+          Max size: 5MB. Allowed formats: JPEG, PNG
         </div>
         
         {/* Preview Section */}
         {billPreview && (
-          <div className="mt-3 relative">
-            <div className="flex items-center justify-between bg-base-200 p-2 rounded-md">
+          <div className="relative mt-3">
+            <div className="flex justify-between items-center p-2 rounded-md bg-base-200">
               <div className="flex-1">
                 {billPreview === 'pdf' ? (
                   <div className="flex items-center text-primary">
@@ -258,7 +245,7 @@ const TransactionForm = ({ initialType = 'expense', onComplete }) => {
                     <span>PDF Document</span>
                   </div>
                 ) : (
-                  <div className="relative w-full h-32 overflow-hidden rounded-md">
+                  <div className="overflow-hidden relative w-full h-32 rounded-md">
                     <img 
                       src={billPreview} 
                       alt="Bill preview" 
@@ -270,7 +257,7 @@ const TransactionForm = ({ initialType = 'expense', onComplete }) => {
               <button 
                 type="button" 
                 onClick={removeBill}
-                className="btn btn-circle btn-sm btn-error ml-2"
+                className="ml-2 btn btn-circle btn-sm btn-error"
               >
                 <FaTrash />
               </button>

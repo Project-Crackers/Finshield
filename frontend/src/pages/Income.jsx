@@ -18,6 +18,8 @@ const Income = () => {
   const [incomeTransactions, setIncomeTransactions] = useState([]);
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [viewImageModal, setViewImageModal] = useState(false);
+const [currentImage, setCurrentImage] = useState('');
   const [stats, setStats] = useState({
     totalIncome: 0,
     pendingIncome: 0,
@@ -96,6 +98,11 @@ const Income = () => {
   const handleViewIncome = (income) => {
     setCurrentIncome(income);
     setShowViewModal(true);
+  };
+
+  const handleViewImage = (imageUrl) => {
+    setCurrentImage(imageUrl);
+    setViewImageModal(true);
   };
 
   // Check if user can approve/reject (Admin or Manager, but not self-approval)
@@ -238,74 +245,81 @@ const Income = () => {
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {incomeTransactions.length > 0 ? (
-            incomeTransactions.map((income) => (
-              <div key={income._id} className="shadow-lg card bg-base-200">
-                <div className="card-body">
-                  <div className="flex justify-between items-start">
-                    <h2 className="card-title">{income.description || income.title}</h2>
-                    <span className={`badge ${getStatusBadgeClass(income.status)}`}>
-                      {income.status}
-                    </span>
-                  </div>
-                  
-                  <div className="mt-2">
-                    <p className="text-2xl font-bold">₹{parseFloat(income.amount).toFixed(2)}</p>
-                    <p className="flex items-center mt-1 text-sm text-base-content/70">
-                      <FaTag className="mr-1" /> {income.category}
-                    </p>
-                    <p className="flex items-center mt-1 text-sm text-base-content/70">
-                      <FaCalendarAlt className="mr-1" /> {new Date(income.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  
-                  <div className="justify-end mt-4 card-actions">
-                    <button
-                      onClick={() => handleViewComments(income)}
-                      className="btn btn-sm btn-outline"
-                    >
-                      <FaComments className="mr-1" /> Comments
-                    </button>
+            incomeTransactions.map((income) => {
+              console.log('Income receipt URL:', income.receiptUrl);
+              return (
+                <div key={income._id} className="shadow-lg card bg-base-200">
+                  <div className="card-body">
+                    <div className="flex justify-between items-start">
+                      <h2 className="card-title">{income.description || income.title}</h2>
+                      <span className={`badge ${getStatusBadgeClass(income.status)}`}>
+                        {income.status}
+                      </span>
+                    </div>
                     
-                    <button
-                      onClick={() => handleViewIncome(income)}
-                      className="btn btn-sm btn-outline btn-primary"
-                    >
-                      <FaEye className="mr-1" /> View
-                    </button>
+                    <div className="mt-2">
+                      <p className="text-2xl font-bold">₹{parseFloat(income.amount).toFixed(2)}</p>
+                      <p className="flex items-center mt-1 text-sm text-base-content/70">
+                        <FaTag className="mr-1" /> {income.category}
+                      </p>
+                      <p className="flex items-center mt-1 text-sm text-base-content/70">
+                        <FaCalendarAlt className="mr-1" /> {new Date(income.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
                     
-                    {income.receiptUrl && (
-                      <a 
-                        href={income.receiptUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="btn btn-sm btn-outline btn-secondary"
+                    <div className="justify-end mt-4 card-actions">
+                      <button
+                        onClick={() => handleViewComments(income)}
+                        className="btn btn-sm btn-outline"
                       >
-                        <FaFilePdf className="mr-1" /> View Doc
-                      </a>
-                    )}
-                    
-                    {/* Simplified condition for approve/reject buttons */}
-                    {(income.status === 'Pending' || income.status === 'pending') && isAdminOrManager && (
-                      <div className="flex gap-2 mt-2 w-full">
+                        <FaComments className="mr-1" /> Comments
+                      </button>
+                      
+                      <button
+                        onClick={() => handleViewIncome(income)}
+                        className="btn btn-sm btn-outline btn-primary"
+                      >
+                        <FaEye className="mr-1" /> View
+                      </button>
+                      
+                      {income.receiptUrl && (
                         <button
-                          onClick={() => handleApproveIncome(income)}
-                          className="flex-1 btn btn-sm btn-success"
+                          onClick={() => handleViewImage(income.receiptUrl)}
+                          className="btn btn-sm btn-outline btn-secondary"
                         >
-                          <FaCheck className="mr-1" /> Approve
+                          {income.receiptUrl.match(/\.(jpg|jpeg|png)$/i) ? (
+                            <>
+                              <FaEye className="mr-1" /> View Image
+                            </>
+                          ) : (
+                            <>
+                              <FaFilePdf className="mr-1" /> View Doc
+                            </>
+                          )}
                         </button>
-                        
-                        <button
-                          onClick={() => handleRejectIncome(income)}
-                          className="flex-1 btn btn-sm btn-error"
-                        >
-                          <FaTimes className="mr-1" /> Reject
-                        </button>
-                      </div>
-                    )}
+                      )}
+                      
+                      {/* Add approve/reject buttons for pending income */}
+                      {(income.status?.toLowerCase() === 'pending') && canApprove(income) && (
+                        <div className="flex gap-2 mt-2 w-full">
+                          <button
+                            onClick={() => handleApproveIncome(income)}
+                            className="flex-1 btn btn-sm btn-success"
+                          >
+                            <FaCheck className="mr-1" /> Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectIncome(income)}
+                            className="flex-1 btn btn-sm btn-error"
+                          >
+                            <FaTimes className="mr-1" /> Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );})
           ) : (
             <div className="col-span-3 p-8 text-center">
               <p className="mb-4 text-lg">No income transactions found</p>
@@ -316,8 +330,8 @@ const Income = () => {
                 <FaPlus className="mr-2" /> Add Your First Income
               </button>
             </div>
-          )}
-        </div>
+          )
+         } </div>
       )}
 
       {/* Add Income Modal */}
@@ -334,6 +348,25 @@ const Income = () => {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {viewImageModal && currentImage && (
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="relative p-2 max-w-4xl bg-white rounded-lg">
+            <button
+              onClick={() => setViewImageModal(false)}
+              className="absolute top-2 right-2 btn btn-sm btn-circle"
+            >
+              ✖
+            </button>
+            <img
+              src={currentImage}
+              alt="Receipt Preview"
+              className="max-h-[80vh] rounded-lg"
+            />
           </div>
         </div>
       )}
@@ -381,14 +414,23 @@ const Income = () => {
               {currentIncome.receiptUrl && (
                 <div className="mt-4">
                   <p className="text-sm font-semibold">Document</p>
-                  <a 
-                    href={currentIncome.receiptUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="mt-1 btn btn-sm btn-outline btn-secondary"
-                  >
-                    <FaFilePdf className="mr-1" /> View Doc
-                  </a>
+                  {currentIncome.receiptUrl.match(/\.(jpg|jpeg|png)$/i) ? (
+                    <button 
+                      onClick={() => handleViewImage(currentIncome.receiptUrl)}
+                      className="mt-1 btn btn-sm btn-outline btn-secondary"
+                    >
+                      <FaEye className="mr-1" /> View Image
+                    </button>
+                  ) : (
+                    <a 
+                      href={currentIncome.receiptUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="mt-1 btn btn-sm btn-outline btn-secondary"
+                    >
+                      <FaFilePdf className="mr-1" /> View Doc
+                    </a>
+                  )}
                 </div>
               )}
             </div>
@@ -401,29 +443,7 @@ const Income = () => {
                 Close
               </button>
               
-              {currentIncome.status === 'Pending' && canApprove(currentIncome) && (
-                <div className="space-x-2">
-                  <button
-                    onClick={() => {
-                      handleApproveIncome(currentIncome);
-                      setShowViewModal(false);
-                    }}
-                    className="btn btn-success"
-                  >
-                    <FaCheck className="mr-1" /> Approve
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      handleRejectIncome(currentIncome);
-                      setShowViewModal(false);
-                    }}
-                    className="btn btn-error"
-                  >
-                    <FaTimes className="mr-1" /> Reject
-                  </button>
-                </div>
-              )}
+              
             </div>
           </div>
         </div>

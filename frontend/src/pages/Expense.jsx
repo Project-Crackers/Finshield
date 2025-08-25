@@ -20,6 +20,7 @@ import {
   FaFilePdf,
 } from "react-icons/fa";
 import transactionService from "../features/transactions/TransactionService";
+import { FaEye } from "react-icons/fa";
 
 const Expense = () => {
   const dispatch = useDispatch();
@@ -34,11 +35,15 @@ const Expense = () => {
     category: "",
     type: "expense",
   });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [showForm, setShowForm] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [commentText, setCommentText] = useState("");
   const [showComments, setShowComments] = useState(false);
+  const [viewImageModal, setViewImageModal] = useState(false);
+  const [currentImage, setCurrentImage] = useState("");
   const { comments, isLoading: commentsLoading } = useSelector(
     (state) => state.comments
   );
@@ -69,7 +74,25 @@ const Expense = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        toast.error('Please upload a valid image (JPEG, PNG, GIF) or PDF file');
+        return;
+      }
+      // Validate file size (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size should be less than 5MB');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.description || !formData.amount || !formData.category) {
@@ -77,24 +100,47 @@ const Expense = () => {
       return;
     }
 
-    dispatch(createTransaction(formData))
-      .unwrap()
-      .then(() => {
-        // Immediately fetch updated transactions after creating a new one
-        dispatch(getTransactions());
+    if (!selectedFile) {
+      toast.error("Please upload a bill or receipt");
+      return;
+    }
 
-        setFormData({
-          description: "",
-          amount: "",
-          category: "",
-          type: "expense",
-        });
-
-        setShowForm(false);
-      })
-      .catch((error) => {
-        console.error("Error creating transaction:", error);
+    try {
+      // Create form data for file upload
+      const fileFormData = new FormData();
+      fileFormData.append('bill', selectedFile);
+      
+      // Upload the file using transactionService
+      const uploadResponse = await transactionService.uploadBill(fileFormData);
+  
+      // Create the transaction with the returned file URL
+      const expenseData = {
+        description: formData.description,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        type: 'expense',
+        billImageUrl: uploadResponse.url // Make sure to use the correct property from the response
+      };
+  
+      await dispatch(createTransaction(expenseData)).unwrap();
+      
+      // Reset form
+      setFormData({
+        description: "",
+        amount: "",
+        category: "",
+        type: "expense",
       });
+      setSelectedFile(null);
+      setUploadProgress(0);
+      setShowForm(false);
+      
+      toast.success("Expense created successfully");
+      dispatch(getTransactions()); // Refresh the list after successful creation
+    } catch (error) {
+      console.error("Error creating transaction:", error);
+      toast.error(error.response?.data?.message || "Failed to create expense");
+    }
   };
 
   // Filter only expenses
@@ -170,7 +216,13 @@ const Expense = () => {
     if (userRole === "Admin") return true;
 
     // Manager can approve expenses not created by themselves
-    if (userRole === "Manager" && expense.user !== userId) return true;
+    if (userRole === "Manager") {
+      // Check if the expense user ID matches the current user ID
+      // The expense.user might be either the full ID or just the ID string
+      const expenseUserId =
+        typeof expense.user === "object" ? expense.user._id : expense.user;
+      return expenseUserId !== userId;
+    }
 
     return false;
   };
@@ -245,11 +297,11 @@ const Expense = () => {
       </div>
 
       {showForm && (
-        <div className="p-6 mb-8 rounded-lg shadow-md bg-base-200">
-          <h2 className="mb-4 text-xl font-semibold">Add New Expense</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="form-control">
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="p-6 w-full max-w-md rounded-lg shadow-xl bg-base-100">
+            <h2 className="mb-4 text-xl font-bold">Add New Expense</h2>
+            <form onSubmit={handleSubmit}>
+              <div className="mb-4 form-control">
                 <label className="label">
                   <span className="label-text">Description</span>
                 </label>
@@ -263,7 +315,7 @@ const Expense = () => {
                 />
               </div>
 
-              <div className="form-control">
+              <div className="mb-4 form-control">
                 <label className="label">
                   <span className="label-text">Amount</span>
                 </label>
@@ -276,7 +328,7 @@ const Expense = () => {
                     name="amount"
                     value={formData.amount}
                     onChange={handleChange}
-                    className="pl-10 input input-bordered"
+                    className="pl-10 w-full input input-bordered"
                     placeholder="0.00"
                     step="0.01"
                     min="0"
@@ -284,7 +336,7 @@ const Expense = () => {
                 </div>
               </div>
 
-              <div className="form-control">
+              <div className="mb-4 form-control">
                 <label className="label">
                   <span className="label-text">Category</span>
                 </label>
@@ -298,9 +350,7 @@ const Expense = () => {
                     onChange={handleChange}
                     className="pl-10 w-full select select-bordered"
                   >
-                    <option value="" disabled>
-                      Select a category
-                    </option>
+                    <option value="" disabled>Select a category</option>
                     <option value="Food">Food</option>
                     <option value="Transportation">Transportation</option>
                     <option value="Utilities">Utilities</option>
@@ -310,18 +360,52 @@ const Expense = () => {
                   </select>
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-end mt-6">
-              <button type="submit" className="btn btn-primary">
-                {isLoading ? (
-                  <FaSpinner className="animate-spin" />
-                ) : (
-                  "Submit Expense"
+              <div className="mb-4 form-control">
+                <label className="label">
+                  <span className="label-text">Upload Bill/Receipt</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    accept=".jpg,.jpeg,.png,.gif,.pdf"
+                    className="hidden"
+                    id="billUpload"
+                  />
+                  <label
+                    htmlFor="billUpload"
+                    className="flex gap-2 items-center px-4 py-2 w-full text-center rounded-lg border transition-colors cursor-pointer border-base-300 hover:bg-base-200"
+                  >
+                    <FaPaperclip />
+                    {selectedFile ? selectedFile.name : "Click to upload bill/receipt"}
+                  </label>
+                </div>
+                {selectedFile && (
+                  <div className="mt-2 text-sm text-base-content/70">
+                    Selected file: {selectedFile.name}
+                  </div>
                 )}
-              </button>
-            </div>
-          </form>
+              </div>
+
+              <div className="flex gap-2 justify-end mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  {isLoading ? (
+                    <FaSpinner className="animate-spin" />
+                  ) : (
+                    "Submit Expense"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -376,16 +460,22 @@ const Expense = () => {
                   >
                     <FaComment className="mr-1" /> Comments
                   </button>
-                  
+
                   {expense.billImageUrl && (
-                    <a 
-                      href={expense.billImageUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => handleViewImage(expense.billImageUrl)}
                       className="btn btn-sm btn-outline btn-secondary"
                     >
-                      <FaFilePdf className="mr-1" /> View Doc
-                    </a>
+                      {expense.billImageUrl.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                        <>
+                          <FaEye className="mr-1" /> View Image
+                        </>
+                      ) : (
+                        <>
+                          <FaFilePdf className="mr-1" /> View Doc
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
 
@@ -411,6 +501,26 @@ const Expense = () => {
           ))}
         </div>
       )}
+
+      {/* Image Preview Modal */}
+      {viewImageModal && currentImage && (
+        <div className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50">
+          <div className="relative p-2 max-w-4xl bg-white rounded-lg">
+            <button
+              onClick={() => setViewImageModal(false)}
+              className="absolute top-2 right-2 btn btn-sm btn-circle"
+            >
+              ✖
+            </button>
+            <img
+              src={currentImage}
+              alt="Bill Preview"
+              className="max-h-[80vh] rounded-lg"
+            />
+          </div>
+        </div>
+      )}
+      {/* End Image Viewer Modal */}
 
       {/* Comments Modal */}
       {/* Inside the comments modal section*/}

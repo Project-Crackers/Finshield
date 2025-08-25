@@ -119,5 +119,4 @@ const transactionService = {
   exportExpensesAsCSV,
   exportExpensesAsPDF
 };
-
 export default transactionService;
